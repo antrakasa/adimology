@@ -8,7 +8,7 @@ interface BrokerFlowCardProps {
   emiten: string;
 }
 
-type LookbackDays = 1 | 7 | 14 | 21;
+type BrokerFlowPeriodOption = '1D' | '7D' | '14D' | '21D';
 
 // Format large numbers (e.g., 24322664000 -> "+24.3 B")
 function formatNetValue(value: string): string {
@@ -92,7 +92,7 @@ export default function BrokerFlowCard({ emiten }: BrokerFlowCardProps) {
   const [data, setData] = useState<BrokerFlowResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lookbackDays, setLookbackDays] = useState<LookbackDays>(7);
+  const [period, setPeriod] = useState<BrokerFlowPeriodOption>('7D');
   const [selectedStatus, setSelectedStatus] = useState<string[]>(['Bandar', 'Whale', 'Retail', 'Mix']);
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function BrokerFlowCard({ emiten }: BrokerFlowCardProps) {
       
       try {
         const statusParam = selectedStatus.length > 0 ? selectedStatus.join(',') : 'None';
-        const response = await fetch(`/api/broker-flow?emiten=${emiten}&lookback_days=${lookbackDays}&broker_status=${statusParam}`);
+        const response = await fetch(`/api/broker-flow?emiten=${emiten}&period=${period}&broker_status=${statusParam}`);
         const json = await response.json();
         
         if (!json.success) {
@@ -120,9 +120,9 @@ export default function BrokerFlowCard({ emiten }: BrokerFlowCardProps) {
     };
 
     fetchData();
-  }, [emiten, lookbackDays, selectedStatus]);
+  }, [emiten, period, selectedStatus]);
 
-  const filterOptions: LookbackDays[] = [1, 7, 14, 21];
+  const filterOptions: BrokerFlowPeriodOption[] = ['1D', '7D', '14D', '21D'];
   const statusOptions = [
     { id: 'Bandar', label: 'Smart Money' },
     { id: 'Whale', label: 'Whale' },
@@ -142,17 +142,7 @@ export default function BrokerFlowCard({ emiten }: BrokerFlowCardProps) {
     <div className="broker-flow-card">
       {/* Header */}
       <div className="broker-flow-header">
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span className="broker-flow-title">Broker Flow</span>
-          <a 
-            href="https://tradersaham.com" 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="broker-flow-source-link"
-          >
-            tradersaham.com
-          </a>
-        </div>
+        <span className="broker-flow-title">Broker Flow</span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {/* Status Filters */}
           <div className="broker-flow-filters">
@@ -173,13 +163,13 @@ export default function BrokerFlowCard({ emiten }: BrokerFlowCardProps) {
 
           {/* Time Filters */}
           <div className="broker-flow-filters">
-            {filterOptions.map((days) => (
+            {filterOptions.map((opt) => (
               <button
-                key={days}
-                className={`broker-flow-filter-btn ${lookbackDays === days ? 'active' : ''}`}
-                onClick={() => setLookbackDays(days)}
+                key={opt}
+                className={`broker-flow-filter-btn ${period === opt ? 'active' : ''}`}
+                onClick={() => setPeriod(opt)}
               >
-                {days}D
+                {opt}
               </button>
             ))}
           </div>

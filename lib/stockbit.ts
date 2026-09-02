@@ -1,4 +1,4 @@
-import type { MarketDetectorResponse, OrderbookResponse, BrokerData, WatchlistResponse, BrokerSummaryData, EmitenInfoResponse, KeyStatsResponse, KeyStatsData, KeyStatsItem, WatchlistGroup } from './types';
+import type { MarketDetectorResponse, OrderbookResponse, BrokerData, WatchlistResponse, BrokerSummaryData, EmitenInfoResponse, KeyStatsResponse, KeyStatsData, KeyStatsItem, WatchlistGroup, RunningTradeChartResponse } from './types';
 import { getSessionValue, updateTokenLastUsed, invalidateToken } from './supabase';
 
 const STOCKBIT_BASE_URL = 'https://exodus.stockbit.com';
@@ -406,6 +406,38 @@ export async function fetchHistoricalSummary(
 
   const json = await response.json();
   return json.data?.result || [];
+}
+
+/**
+ * Fetch running trade chart data (per-broker daily net value/volume) for an
+ * explicit set of broker codes and date range. Unlike the period-enum variant,
+ * this returns full daily granularity for exactly the brokers requested,
+ * instead of Stockbit's own ~5 "top mover" selection.
+ */
+export async function fetchRunningTradeChartByBrokers(
+  emiten: string,
+  brokerCodes: string[],
+  fromDate: string,
+  toDate: string,
+  marketBoard: string = 'BOARD_TYPE_REGULAR'
+): Promise<RunningTradeChartResponse> {
+  const url = new URL(`${STOCKBIT_BASE_URL}/order-trade/running-trade/chart/${emiten}`);
+  for (const code of brokerCodes) {
+    url.searchParams.append('broker_code', code);
+  }
+  url.searchParams.set('from', fromDate);
+  url.searchParams.set('to', toDate);
+  url.searchParams.set('investor_type', 'INVESTOR_TYPE_ALL');
+  url.searchParams.set('market_board', marketBoard);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: await getHeaders(),
+  });
+
+  await handleApiResponse(response, 'Running Trade Chart API');
+
+  return response.json();
 }
 
 /**

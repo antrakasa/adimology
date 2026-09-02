@@ -1,10 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { BrokerFlowResponse } from '@/lib/types';
+import { fetchMarketDetector, fetchRunningTradeChartByBrokers } from '@/lib/stockbit';
+import { transformRunningTradeChartToBrokerFlow, pickTopBrokerCodes, finalizeBrokerFlow } from '@/lib/broker-flow-transform';
+import type { BrokerFlowPeriod, BrokerFlowResponse } from '@/lib/types';
+
+const VALID_PERIODS: BrokerFlowPeriod[] = ['1D', '7D', '14D', '21D'];
+const PERIOD_DAYS: Record<BrokerFlowPeriod, number> = { '1D': 1, '7D': 7, '14D': 14, '21D': 21 };
+// Stockbit's running-trade-chart endpoint rejects requests for more than 7
+// broker codes at once ("Broker limit exceeded: a maximum of 7 brokers are
+// allowed", confirmed empirically — not documented anywhere).
+const TOP_N_BROKERS = 7;
+
+// IDX trades in WIB (UTC+7); shift before formatting so the date boundary
+// matches Jakarta's calendar day regardless of the server's own timezone.
+function jakartaNow(): Date {
+  return new Date(Date.now() + 7 * 60 * 60 * 1000);
+}
+
+function toDateString(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+// This endpoint variant (explicit broker_code + from/to) only serves
+// completed trading sessions — passing today's date as `to` gets rejected
+// with a 400 regardless of broker codes (confirmed empirically; the
+// period-enum variant is the one that supports live/current-session data).
+// So the window is anchored to the most recent completed day, not today.
+function mostRecentCompletedDay(now: Date): Date {
+  const d = new Date(now);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d;
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const emiten = searchParams.get('emiten');
-  const lookbackDays = searchParams.get('lookback_days') || '7';
+  const periodParam = searchParams.get('period') || '7D';
   const brokerStatus = searchParams.get('broker_status') || 'Bandar,Whale,Retail,Mix';
 
   if (!emiten) {
@@ -14,47 +44,38 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const period: BrokerFlowPeriod = VALID_PERIODS.includes(periodParam as BrokerFlowPeriod)
+    ? (periodParam as BrokerFlowPeriod)
+    : '7D';
+
   try {
-    // Transform brokerStatus for the upstream API: 'Mix' -> 'Retail / Bandar'
-    const upstreamBrokerStatus = brokerStatus
-      .split(',')
-      .map(s => s.trim() === 'Mix' ? 'Retail / Bandar' : s.trim())
-      .join(',');
+    const emitenUpper = emiten.toUpperCase();
 
-    const url = new URL('https://api.tradersaham.com/api/market-insight/broker-intelligence');
-    url.searchParams.set('limit', '100');
-    url.searchParams.set('page', '1');
-    url.searchParams.set('sort_by', 'consistency');
-    url.searchParams.set('mode', 'accum');
-    url.searchParams.set('lookback_days', lookbackDays);
-    url.searchParams.set('broker_status', upstreamBrokerStatus);
-    url.searchParams.set('search', emiten.toLowerCase());
+    const toDate = mostRecentCompletedDay(jakartaNow());
+    const to = toDateString(toDate);
+    const fromDate = new Date(toDate);
+    fromDate.setUTCDate(fromDate.getUTCDate() - (PERIOD_DAYS[period] - 1));
+    const from = toDateString(fromDate);
 
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-      cache: 'no-store',
-    });
+    // Market Detector ranks active brokers by net value over [from, to] —
+    // used only to pick which broker codes to request full daily data for.
+    const marketDetector = await fetchMarketDetector(emitenUpper, from, to);
+    const brokerCodes = pickTopBrokerCodes(marketDetector, TOP_N_BROKERS);
 
-    if (!response.ok) {
-      throw new Error(`Tradersaham API returned ${response.status}`);
+    let data: BrokerFlowResponse;
+    if (brokerCodes.length === 0) {
+      data = { trading_dates: [], total_trading_days: 0, sort_by: 'consistency', activities: [] };
+    } else {
+      const raw = await fetchRunningTradeChartByBrokers(emitenUpper, brokerCodes, from, to);
+      data = transformRunningTradeChartToBrokerFlow(raw.data, emitenUpper);
     }
 
-    const rawData = await response.json();
-    
-    // Map 'Retail / Bandar' back to 'Mix' in the response activities
-    if (rawData && rawData.activities) {
-      rawData.activities = rawData.activities.map((activity: any) => ({
-        ...activity,
-        broker_status: activity.broker_status === 'Retail / Bandar' ? 'Mix' : activity.broker_status
-      }));
-    }
+    const brokerStatusFilter = brokerStatus.split(',').map(s => s.trim()).filter(Boolean);
+    data = finalizeBrokerFlow(data, brokerStatusFilter, TOP_N_BROKERS);
 
     return NextResponse.json({
       success: true,
-      data: rawData,
+      data,
     });
   } catch (error) {
     console.error('Broker Flow API error:', error);

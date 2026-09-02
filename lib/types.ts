@@ -302,6 +302,59 @@ export interface BrokerFlowResponse {
   activities: BrokerFlowActivity[];
 }
 
+// --- Stockbit Running Trade Chart (raw upstream shape) ---
+export interface StockbitChartValue {
+  raw: string;
+  formatted: string;
+}
+
+export interface StockbitPriceChartPoint {
+  date: string;
+  time: string;
+  value: StockbitChartValue;
+  datetime_label: string;
+  open?: StockbitChartValue | null;
+  high?: StockbitChartValue | null;
+  low?: StockbitChartValue | null;
+}
+
+export interface StockbitBrokerChartPoint {
+  date: string;
+  time: string;
+  value: StockbitChartValue;
+  datetime_label: string;
+  open?: StockbitChartValue | null;
+  high?: StockbitChartValue | null;
+  low?: StockbitChartValue | null;
+}
+
+export interface StockbitBrokerChart {
+  broker_code: string;
+  chart: StockbitBrokerChartPoint[];
+}
+
+export interface StockbitBrokerChartData {
+  type: 'TYPE_CHART_VALUE' | 'TYPE_CHART_VOLUME';
+  brokers: string[];
+  charts: StockbitBrokerChart[];
+}
+
+export interface RunningTradeChartData {
+  from: string;
+  to: string;
+  data_last_updated: string;
+  price_chart_data: StockbitPriceChartPoint[];
+  broker_chart_data: StockbitBrokerChartData[];
+  date_session_info: string;
+}
+
+export interface RunningTradeChartResponse {
+  data: RunningTradeChartData;
+  message: string;
+}
+
+export type BrokerFlowPeriod = '1D' | '7D' | '14D' | '21D';
+
 // Background Job Log Types
 export interface BackgroundJobLogEntry {
   timestamp: string;
