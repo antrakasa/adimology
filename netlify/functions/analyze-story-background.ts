@@ -7,6 +7,15 @@ import {
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_STORY_MODEL = process.env.GEMINI_STORY_MODEL || 'gemini-3-flash-preview';
+
+const VALID_THINKING_LEVELS = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'] as const;
+const requestedThinkingLevel = process.env.GEMINI_STORY_THINKING_LEVEL?.toUpperCase();
+const GEMINI_STORY_THINKING_LEVEL = (
+  VALID_THINKING_LEVELS.includes(requestedThinkingLevel as typeof VALID_THINKING_LEVELS[number])
+    ? requestedThinkingLevel
+    : 'HIGH'
+) as ThinkingLevel;
 
 export default async (req: Request) => {
   const startTime = Date.now();
@@ -68,7 +77,7 @@ export default async (req: Request) => {
     if (jobLogId) {
       await appendBackgroundJobLogEntry(jobLogId, {
         level: 'info',
-        message: `Analyzing using Gemini 3 Flash Preview (Thinking HIGH)...`,
+        message: `Analyzing using ${GEMINI_STORY_MODEL} (Thinking ${GEMINI_STORY_THINKING_LEVEL})...`,
         emiten,
       });
     }
@@ -79,12 +88,12 @@ export default async (req: Request) => {
 
     const config = {
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.HIGH,
+        thinkingLevel: GEMINI_STORY_THINKING_LEVEL,
       },
     };
 
     const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-    const model = 'gemini-3-flash-preview';
+    const model = GEMINI_STORY_MODEL;
     const systemPrompt = "Kamu adalah seorang analis saham profesional Indonesia yang ahli dalam menganalisa story dan katalis pergerakan harga saham.";
     
     let keyStatsContext = '';
