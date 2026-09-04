@@ -96,6 +96,20 @@ export default function AgentStoryCard({ stories, status, onRetry }: AgentStoryC
           AI Story Analysis
         </h3>
 
+        {data?.model && (
+          <span style={{
+            fontSize: '0.7rem',
+            color: 'var(--text-muted)',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '999px',
+            padding: '2px 8px',
+            whiteSpace: 'nowrap'
+          }}>
+            {data.model}{data.thinking_level ? ` · ${data.thinking_level}` : ''}
+          </span>
+        )}
+
         {/* Multi-version Dropdown */}
         {stories.length > 1 && (
           <select 

@@ -418,6 +418,8 @@ export async function updateAgentStory(id: number, data: {
   kesimpulan?: string;
   error_message?: string;
   sources?: { title: string; uri: string }[];
+  model?: string;
+  thinking_level?: string;
 }) {
 
   const { data: result, error } = await supabase

@@ -72,7 +72,11 @@ export default async (req: Request) => {
     }
 
     // Update agent story status to processing
-    await updateAgentStory(parseInt(storyId), { status: 'processing' });
+    await updateAgentStory(parseInt(storyId), {
+      status: 'processing',
+      model: GEMINI_STORY_MODEL,
+      thinking_level: GEMINI_STORY_THINKING_LEVEL,
+    });
 
     if (jobLogId) {
       await appendBackgroundJobLogEntry(jobLogId, {
