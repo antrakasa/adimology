@@ -16,6 +16,11 @@
 
 ## Changelog
 
+### v0.4.3 (2026-09-06)
+- **AI Story Anti-Stuck**: Kartu AI Story tidak lagi polling tanpa henti saat analisis macet di status `pending`/`processing` — polling otomatis menyerah setelah 3 menit dan menampilkan pesan error beserta tombol "Coba Lagi".
+- **Trigger Background Function Diperkuat**: Pemanggilan Netlify background function untuk analisis kini di-`await`; jika gagal terkirim, status langsung ditandai error alih-alih diam-diam macet selamanya di `pending`.
+- **Timeout Analisis Gemini**: Pemanggilan Gemini di background function dibatasi 4 menit, jadi permintaan yang menggantung tetap ditandai error alih-alih menggantung sampai batas keras eksekusi Netlify.
+
 ### v0.4.2 (2026-09-04)
 - **BrokerFlowCard Migration**: Mengganti sumber data `BrokerFlowCard` dari API `tradersaham.com` (sudah tidak aktif) ke endpoint `running-trade-chart` milik Stockbit, tetap mempertahankan format heatmap harian & consistency yang ada.
 - **Top 7 Broker Aktif**: Market Detector kini memilih 7 broker paling aktif (batas maksimal dari Stockbit) untuk window yang dipilih, lalu mengambil data net value harian untuk semuanya sekaligus.
@@ -25,11 +30,6 @@
 ### v0.4.1 (2026-02-24)
 - **Security Hardening**: Implementasi global API protection menggunakan **Next.js 16 Proxy**.
 - **API Request Optimization**: Implementasi *request deduplication* pada indikator status dan pembatasan minimal 4 karakter pada input emiten untuk menghemat kuota request.
-
-### v0.4.0 (2026-02-23)
-- **High-Fidelity Copy Image**: Migrasi dari `html2canvas` ke `html-to-image` untuk hasil capture yang lebih tajam (HD) dan akurat.
-- **Transparent Corners**: Optimalisasi capture spesifik pada elemen card untuk menghasilkan pojok yang transparan (rounded).
-- **Clean Capture**: Penambahan fitur filter otomatis untuk menyembunyikan tombol aksi footer dari hasil gambar copy.
 
 📜 Riwayat versi sebelumnya ada di **[CHANGELOG.md](CHANGELOG.md)**.
 

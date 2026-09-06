@@ -2,6 +2,11 @@
 
 Riwayat lengkap perubahan Adimology. 3 versi terbaru selalu ditampilkan di [README.md](README.md#changelog); versi yang lebih lama diarsipkan di sini.
 
+### v0.4.0 (2026-02-23)
+- **High-Fidelity Copy Image**: Migrasi dari `html2canvas` ke `html-to-image` untuk hasil capture yang lebih tajam (HD) dan akurat.
+- **Transparent Corners**: Optimalisasi capture spesifik pada elemen card untuk menghasilkan pojok yang transparan (rounded).
+- **Clean Capture**: Penambahan fitur filter otomatis untuk menyembunyikan tombol aksi footer dari hasil gambar copy.
+
 ### v0.3.3 (2026-02-22)
 - **Password Protection**: Implementasi keamanan akses aplikasi dengan proteksi password.
 - **Session-based Unlocking**: Mekanisme akses satu kali per sesi.
