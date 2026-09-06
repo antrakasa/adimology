@@ -71,6 +71,7 @@ export default function Calculator({ selectedStock }: CalculatorProps) {
   const [agentStories, setAgentStories] = useState<AgentStoryResult[]>([]);
   const [storyStatus, setStoryStatus] = useState<'idle' | 'pending' | 'processing' | 'completed' | 'error'>('idle');
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollAttemptsRef = useRef(0);
 
   // Date state lifted from InputForm
   const [fromDate, setFromDate] = useState(getDefaultDate());
@@ -200,11 +201,16 @@ export default function Calculator({ selectedStock }: CalculatorProps) {
   }, [error, selectedStock, result, fromDate, toDate]);
 
   // Resume polling only (GET) for an in-progress story — does NOT create a new analysis
+  const MAX_POLL_ATTEMPTS = 60; // ~5 minutes at the 5s interval below — avoids polling forever on a stuck job
   const resumeStoryPolling = (emiten: string) => {
     setStoryStatus('processing');
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    pollAttemptsRef.current = 0;
 
     pollIntervalRef.current = setInterval(async () => {
+      pollAttemptsRef.current += 1;
+      let reachedTerminal = false;
+
       try {
         const statusRes = await fetch(`/api/analyze-story?emiten=${emiten}`);
         const statusData = await statusRes.json();
@@ -215,17 +221,40 @@ export default function Calculator({ selectedStock }: CalculatorProps) {
 
           const latest = stories[0];
           if (latest.status === 'completed') {
+            reachedTerminal = true;
             setStoryStatus('completed');
-            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           } else if (latest.status === 'error') {
+            reachedTerminal = true;
             setStoryStatus('error');
-            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          } else if (latest.status === 'processing') {
+          } else if (latest.status === 'processing' || latest.status === 'pending') {
             setStoryStatus('processing');
           }
         }
       } catch (err) {
         console.error('Polling error:', err);
+      }
+
+      if (reachedTerminal || pollAttemptsRef.current >= MAX_POLL_ATTEMPTS) {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        if (!reachedTerminal) {
+          // Gave up waiting on a stuck job — surface a clear error instead of spinning forever
+          setStoryStatus('error');
+          setAgentStories((prev) =>
+            prev.length > 0
+              ? [
+                  {
+                    ...prev[0],
+                    status: 'error',
+                    error_message: 'Analisis memakan waktu terlalu lama. Coba lagi nanti.',
+                  },
+                  ...prev.slice(1),
+                ]
+              : prev
+          );
+        }
       }
     }, 5000);
   };

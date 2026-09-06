@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAgentStory, getAgentStoriesByEmiten } from '@/lib/supabase';
+import { createAgentStory, getAgentStoriesByEmiten, updateAgentStory } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -59,14 +59,29 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Agent Story] Triggering background function at: ${functionUrl}/analyze-story-background`);
 
-    // Fire and forget - don't await
-    fetch(`${functionUrl}/analyze-story-background?emiten=${emiten}&id=${story.id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keyStats })
-    }).catch(err => console.error('Failed to trigger background function:', err));
+    // Await the invocation itself (Netlify background functions still return
+    // immediately - this does NOT wait for the analysis to finish). This avoids
+    // leaving the row stuck at 'pending' forever if the trigger request never
+    // makes it out (e.g. the execution context freezes right after we respond).
+    try {
+      await fetch(`${functionUrl}/analyze-story-background?emiten=${emiten}&id=${story.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyStats })
+      });
+    } catch (triggerError) {
+      console.error('Failed to trigger background function:', triggerError);
+      await updateAgentStory(story.id, {
+        status: 'error',
+        error_message: 'Gagal memulai proses analisis'
+      });
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to trigger background analysis'
+      }, { status: 502 });
+    }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true, 
       data: story,
       message: 'Analysis started'

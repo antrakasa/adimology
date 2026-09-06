@@ -17,6 +17,24 @@ const GEMINI_STORY_THINKING_LEVEL = (
     : 'HIGH'
 ) as ThinkingLevel;
 
+const GEMINI_STORY_TIMEOUT_MS = 4 * 60 * 1000; // 4 minutes — give up before Netlify's hard function limit so we always write a status
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 export default async (req: Request) => {
   const startTime = Date.now();
   let jobLogId: number | null = null;
@@ -166,19 +184,28 @@ Berikan analisis dalam format JSON dengan struktur berikut (PASTIKAN HANYA OUTPU
       },
     ] as any;
 
-    const responseStream = await (ai.models as any).generateContentStream({
-      model,
-      config,
-      contents,
-      tools,
-    });
+    async function generateStoryText(): Promise<string> {
+      const responseStream = await (ai.models as any).generateContentStream({
+        model,
+        config,
+        contents,
+        tools,
+      });
 
-    let fullText = '';
-    for await (const chunk of responseStream) {
-      if (chunk.text) {
-        fullText += chunk.text;
+      let text = '';
+      for await (const chunk of responseStream) {
+        if (chunk.text) {
+          text += chunk.text;
+        }
       }
+      return text;
     }
+
+    const fullText = await withTimeout(
+      generateStoryText(),
+      GEMINI_STORY_TIMEOUT_MS,
+      'Gemini request timed out'
+    );
 
     if (jobLogId) {
       await appendBackgroundJobLogEntry(jobLogId, {
