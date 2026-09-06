@@ -201,7 +201,7 @@ export default function Calculator({ selectedStock }: CalculatorProps) {
   }, [error, selectedStock, result, fromDate, toDate]);
 
   // Resume polling only (GET) for an in-progress story — does NOT create a new analysis
-  const MAX_POLL_ATTEMPTS = 60; // ~5 minutes at the 5s interval below — avoids polling forever on a stuck job
+  const MAX_POLL_ATTEMPTS = 36; // ~3 minutes at the 5s interval below — avoids polling forever on a stuck job
   const resumeStoryPolling = (emiten: string) => {
     setStoryStatus('processing');
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
